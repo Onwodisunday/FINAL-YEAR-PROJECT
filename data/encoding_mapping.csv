@@ -1,0 +1,13 @@
+column,original_value,encoded_value
+cloud_provider,AWS,0
+cloud_provider,Azure,1
+cloud_provider,GCP,2
+region,asia-south,0
+region,us-east,1
+region,us-west,2
+vm_type,B1s,0
+vm_type,n1-standard-1,1
+vm_type,t2.micro,2
+target,no_action,0
+target,scale_down,1
+target,scale_up,2
