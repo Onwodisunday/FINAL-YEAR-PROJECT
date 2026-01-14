@@ -23,7 +23,7 @@ This structure ensures reproducibility, transparency, and academic integrity.
 
 Purpose:
 This file is the raw dataset used as the primary data source for the project.
-source:::::::::::::https://www.kaggle.com/datasets/freshersstaff/multi-cloud-resource-dataset:::::
+source:::::::::::::   https://www.kaggle.com/datasets/freshersstaff/multi-cloud-resource-dataset    :::::
 
 Role in the project:
 - Serves as the original source of data
