@@ -9,7 +9,7 @@ preparation pipeline. All files are labelled datasets, meaning every record
 contains a known target outcome.
 
 Dataset folder contents:
-- Cloud_Dataset.csv
+- Cloud_Dataset.csv, https://www.kaggle.com/datasets/freshersstaff/multi-cloud-resource-dataset
 - cleaned_encoded_dataset.csv
 - train_data.csv
 - test_data.csv
@@ -23,6 +23,7 @@ This structure ensures reproducibility, transparency, and academic integrity.
 
 Purpose:
 This file is the raw dataset used as the primary data source for the project.
+source:::::::::::::https://www.kaggle.com/datasets/freshersstaff/multi-cloud-resource-dataset:::::
 
 Role in the project:
 - Serves as the original source of data
