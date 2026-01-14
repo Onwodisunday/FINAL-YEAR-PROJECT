@@ -1,0 +1,181 @@
+DATASET DESCRIPTION AND EXPLANATION
+==================================
+
+1. OVERVIEW OF THE DATASET FOLDER
+
+All datasets used in this project are stored in a single, well-structured folder
+within the GitHub repository. Each file represents a specific stage in the data
+preparation pipeline. All files are labelled datasets, meaning every record
+contains a known target outcome.
+
+Dataset folder contents:
+- Cloud_Dataset.csv
+- cleaned_encoded_dataset.csv
+- train_data.csv
+- test_data.csv
+- encoding_mapping.csv
+- encode.py
+
+This structure ensures reproducibility, transparency, and academic integrity.
+
+
+2. ORIGINAL DATASET: Cloud_Dataset.csv
+
+Purpose:
+This file is the raw dataset used as the primary data source for the project.
+
+Role in the project:
+- Serves as the original source of data
+- Represents real-world hardware monitoring information
+- Used as input for all preprocessing steps
+
+Structure:
+The dataset contains:
+- Numerical features (sensor readings, system metrics, usage statistics)
+- Categorical features (hardware type, system state, configuration attributes)
+- A target column named "target" indicating hardware failure status
+
+Suitability:
+The dataset is suitable because it directly reflects hardware operating
+conditions and includes labelled outcomes required for supervised machine
+learning.
+
+
+3. DATA PROCESSING SCRIPT: encode.py
+
+Purpose:
+The encode.py script defines the complete preprocessing pipeline for the dataset.
+
+Operations performed:
+- Standardization of column names
+- Removal of non-predictive columns such as timestamps
+- Removal of duplicate records
+- Handling of missing values:
+  * Numeric columns filled with median values
+  * Categorical columns filled with mode values
+- Encoding of categorical variables into numeric form
+- Stratified splitting of the dataset into training and testing sets
+- Saving of all processed datasets and encoding mappings
+
+Importance:
+This script ensures consistency, prevents data leakage, and guarantees
+reproducibility of results.
+
+
+4. CLEANED AND ENCODED DATASET: cleaned_encoded_dataset.csv
+
+Purpose:
+This file represents the fully preprocessed version of the original dataset.
+
+Contents:
+- No missing values
+- No duplicate records
+- All categorical features encoded numerically
+- Includes the target column
+
+Role in the project:
+- Used for exploratory data analysis
+- Used for feature analysis
+- Serves as the final dataset for machine learning experiments
+
+This dataset is fully compatible with machine learning algorithms.
+
+
+5. TRAINING DATASET: train_data.csv
+
+Purpose:
+Used to train machine learning models.
+
+Creation:
+- Derived from the cleaned and encoded dataset
+- 80 percent of the data
+- Stratified based on the target column
+
+Contents:
+- Numerical input features
+- Target label
+
+Importance:
+Stratification ensures balanced class distribution, improves learning stability,
+and reduces model bias.
+
+
+6. TESTING DATASET: test_data.csv
+
+Purpose:
+Used to evaluate the trained machine learning models.
+
+Creation:
+- Derived from the cleaned and encoded dataset
+- 20 percent of the data
+- Completely independent from the training dataset
+
+Role in the project:
+- Used to measure accuracy, precision, recall, and F1-score
+- Used to test generalization performance
+- Prevents overfitting
+
+Evaluation on unseen data is essential for supervised learning.
+
+
+7. ENCODING REFERENCE FILE: encoding_mapping.csv
+
+Purpose:
+Provides transparency for categorical feature encoding.
+
+Contents:
+- Column name
+- Original categorical value
+- Corresponding encoded numeric value
+
+Importance:
+- Allows interpretation of model inputs and outputs
+- Supports explainability
+- Ensures reproducibility of preprocessing steps
+
+
+8. LABELING OF THE DATASET
+
+All datasets used in this project are labelled.
+
+Target definition:
+- 0 represents no hardware failure
+- 1 represents hardware failure
+
+Importance of labeling:
+- Enables supervised machine learning
+- Allows objective model evaluation
+- Supports predictive maintenance applications
+
+
+9. RELATIONSHIP BETWEEN ALL FILES
+
+Data processing flow:
+
+Cloud_Dataset.csv
+        |
+     encode.py
+        |
+cleaned_encoded_dataset.csv
+        |
+ -----------------------------
+ |                           |
+train_data.csv        test_data.csv
+        |
+encoding_mapping.csv
+
+This pipeline ensures clean data preparation, no information leakage, and
+proper separation of training and testing data.
+
+
+10. FINAL JUSTIFICATION
+
+The dataset used in this project is a labelled hardware monitoring dataset
+processed using a structured and reproducible preprocessing pipeline. All
+categorical features were encoded, missing values were handled appropriately,
+and the dataset was stratified into training and testing subsets. This ensures
+the dataset is suitable for supervised machine learning-based predictive
+hardware failure detection.
+
+
+END OF FILE
