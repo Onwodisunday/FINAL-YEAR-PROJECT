@@ -62,6 +62,11 @@ one_hot_encoder = OneHotEncoder(
 categorical_features = ['cloud_provider', "vm_type"]
 one_hot_encoded = one_hot_encoder.fit_transform(df[categorical_features])
 
+# Store the original categorical columns for later decoding
+categorical_feature_names = one_hot_encoder.get_feature_names_out(
+    categorical_features)
+original_df = df.copy()  # Keep a copy for reference
+
 
 # In[72]:
 
@@ -309,11 +314,25 @@ st.pyplot(plt.gcf())
 st.markdown("---")
 st.header("🔍 Feature Importance Analysis")
 
+# Function to get readable feature names (decode one-hot encoded)
+
+
+def get_readable_feature_name(feature_name):
+    """Convert one-hot encoded feature names back to readable form"""
+    if 'cloud_provider_' in feature_name:
+        return f"Cloud Provider: {feature_name.split('_')[-1]}"
+    elif 'vm_type_' in feature_name:
+        return f"VM Type: {feature_name.split('_')[-1]}"
+    else:
+        return feature_name
+
+
 # Feature importance
 importances = best_rf.feature_importances_
-feature_names = X.columns
+feature_names_orig = X.columns
 feature_importance_df = pd.DataFrame({
-    'Feature': feature_names,
+    'Feature': feature_names_orig,
+    'Readable Feature': [get_readable_feature_name(f) for f in feature_names_orig],
     'Importance': importances
 }).sort_values(by='Importance', ascending=False)
 
@@ -324,16 +343,18 @@ feature_importance_df = pd.DataFrame({
 st.subheader("Top 10 Most Important Features")
 fig, ax = plt.subplots(figsize=(10, 6))
 top_10 = feature_importance_df.head(10)
-ax.barh(top_10['Feature'], top_10['Importance'], color='steelblue')
+ax.barh(top_10['Readable Feature'], top_10['Importance'], color='steelblue')
 ax.set_xlabel('Importance Score')
 ax.set_ylabel('Feature')
 ax.set_title('Top 10 Feature Importance')
 plt.tight_layout()
 st.pyplot(fig)
 
-# Display all features in a table
+# Display all features in a table (show readable names)
 st.subheader("All Features Importance Scores")
-st.dataframe(feature_importance_df, use_container_width=True)
+display_df = feature_importance_df[['Readable Feature', 'Importance']].copy()
+display_df.columns = ['Feature', 'Importance']
+st.dataframe(display_df, use_container_width=True)
 
 
 # In[119]:
@@ -374,8 +395,22 @@ col1, col2 = st.columns(2)
 # Dictionary to store user inputs
 user_input = {}
 
-# Create input fields for each feature
+# Add cloud provider selection at the top
+st.subheader("Select Cloud Provider")
+cloud_provider = st.selectbox(
+    "Cloud Provider",
+    options=["AWS", "AZURE", "GCP"],
+    index=0
+)
+
+st.subheader("Input Feature Values")
+
+# Create input fields for each feature (excluding one-hot encoded cloud provider columns)
 for i, feature in enumerate(feature_names):
+    # Skip one-hot encoded cloud provider columns
+    if 'cloud_provider' in feature:
+        continue
+
     # Get min and max from training data for slider bounds
     feature_min = float(X[feature].min())
     feature_max = float(X[feature].max())
@@ -411,8 +446,19 @@ for i, feature in enumerate(feature_names):
 
 # Create prediction button
 if st.button("🚀 Get Prediction", key="predict_btn"):
-    # Prepare the input data
+    # Add cloud provider one-hot encoding to user input
+    for col in feature_names:
+        if 'cloud_provider' in col:
+            # Set the selected provider to 1, others to 0
+            # Extract provider name from column name
+            provider_name = col.split('_')[-1]
+            user_input[col] = 1.0 if provider_name.upper(
+            ) == cloud_provider.upper() else 0.0
+
+    # Prepare the input data with columns in the same order as training data
     user_input_df = pd.DataFrame([user_input])
+    # Reorder columns to match training data
+    user_input_df = user_input_df[X.columns]
 
     # Make prediction
     prediction = best_rf.predict(user_input_df)[0]
@@ -449,6 +495,13 @@ if st.button("🚀 Get Prediction", key="predict_btn"):
 
     # Show input values used
     with st.expander("View Input Features"):
-        input_display_df = pd.DataFrame([user_input]).T
-        input_display_df.columns = ['Value']
-        st.dataframe(input_display_df)
+        # Create readable version of input with decoded categorical names
+        display_input = {}
+        for feature, value in user_input.items():
+            readable_name = get_readable_feature_name(feature)
+            display_input[readable_name] = round(
+                float(value), 4) if isinstance(value, (int, float)) else value
+
+        input_display_df = pd.DataFrame(
+            list(display_input.items()), columns=['Feature', 'Value'])
+        st.dataframe(input_display_df, use_container_width=True)
