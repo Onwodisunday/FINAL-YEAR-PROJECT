@@ -2,13 +2,14 @@
 # coding: utf-8
 
 import pandas as pd
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, ConfusionMatrixDisplay
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from imblearn.over_sampling import RandomOverSampler
 import matplotlib.pyplot as plt
 import streamlit as st
+import numpy as np
 import joblib
 import os
 import auth_utils  # Import authentication utilities
@@ -240,45 +241,112 @@ else:
     # Balancing
     X_train_balanced, y_train_balanced = RandomOverSampler(random_state=42).fit_resample(X_train, y_train)
 
+    # ============================================
+    # GREY WOLF OPTIMIZER (GWO) FOR HYPERPARAMETER TUNING
+    # ============================================
+    def decode_wolf(position):
+        """Convert a continuous wolf position vector into RF hyperparameters."""
+        n_estimators    = int(np.clip(round(position[0]), 10, 300))
+        max_depth_raw   = position[1]
+        # Treat values below 1.0 as None (no depth limit), otherwise use int
+        max_depth       = None if max_depth_raw < 1.0 else int(np.clip(round(max_depth_raw), 1, 30))
+        min_samples_leaf = int(np.clip(round(position[2]), 1, 8))
+        bootstrap       = bool(round(np.clip(position[3], 0, 1)))
+        return {
+            "n_estimators":     n_estimators,
+            "max_depth":        max_depth,
+            "min_samples_leaf": min_samples_leaf,
+            "bootstrap":        bootstrap,
+        }
+
+    def gwo_fitness(position, X_tr, y_tr, X_val, y_val):
+        """Evaluate one wolf: train RF with decoded params, return validation accuracy."""
+        params = decode_wolf(position)
+        model = RandomForestClassifier(random_state=42, n_jobs=-1, **params)
+        model.fit(X_tr, y_tr)
+        return accuracy_score(y_val, model.predict(X_val))
+
+    def grey_wolf_optimizer(X_tr, y_tr, X_val, y_val,
+                            n_wolves=10, max_iter=20):
+        """
+        GWO minimises a cost; we maximise accuracy so cost = 1 - accuracy.
+
+        Search space (4 dimensions):
+          [0] n_estimators    : 10 – 300  (continuous, rounded to int)
+          [1] max_depth       :  0 – 30   (< 1.0 → None, else rounded to int)
+          [2] min_samples_leaf:  1 – 8    (continuous, rounded to int)
+          [3] bootstrap       :  0 – 1    (rounded to 0/1 → False/True)
+        """
+        import numpy as np
+
+        lb = np.array([10,  0.0, 1, 0])
+        ub = np.array([300, 30.0, 8, 1])
+        dim = len(lb)
+
+        # Initialise pack randomly within bounds
+        wolves = lb + np.random.rand(n_wolves, dim) * (ub - lb)
+        fitness = np.array([gwo_fitness(w, X_tr, y_tr, X_val, y_val) for w in wolves])
+
+        # Alpha = best, Beta = 2nd, Delta = 3rd
+        sorted_idx = np.argsort(fitness)[::-1]
+        alpha_pos, beta_pos, delta_pos = wolves[sorted_idx[0]].copy(), wolves[sorted_idx[1]].copy(), wolves[sorted_idx[2]].copy()
+        alpha_score = fitness[sorted_idx[0]]
+
+        for t in range(max_iter):
+            a = 2 - 2 * (t / max_iter)          # linearly decreases 2 → 0
+
+            for i in range(n_wolves):
+                new_pos = np.zeros(dim)
+                for leader in [alpha_pos, beta_pos, delta_pos]:
+                    r1, r2 = np.random.rand(dim), np.random.rand(dim)
+                    A = 2 * a * r1 - a
+                    C = 2 * r2
+                    D = np.abs(C * leader - wolves[i])
+                    new_pos += leader - A * D
+                wolves[i] = np.clip(new_pos / 3, lb, ub)
+
+            # Re-evaluate
+            fitness = np.array([gwo_fitness(w, X_tr, y_tr, X_val, y_val) for w in wolves])
+            sorted_idx = np.argsort(fitness)[::-1]
+            if fitness[sorted_idx[0]] > alpha_score:
+                alpha_score = fitness[sorted_idx[0]]
+                alpha_pos   = wolves[sorted_idx[0]].copy()
+                beta_pos    = wolves[sorted_idx[1]].copy()
+                delta_pos   = wolves[sorted_idx[2]].copy()
+
+        best_params = decode_wolf(alpha_pos)
+        return best_params, alpha_score
+
     @st.cache_resource
-    def train_model_for_provider(provider_name, _X_train, _y_train):
-        """Train model for specific provider using GridSearchCV and cache"""
-        model_filename = f'best_rf_model_{provider_name}.pkl'
+    def train_model_for_provider(provider_name, _X_train, _y_train, _X_val, _y_val):
+        """Train model for specific provider using GWO and cache the result."""
+        import numpy as np
+        model_filename  = f'best_rf_model_{provider_name}.pkl'
         params_filename = f'best_rf_params_{provider_name}.pkl'
 
-        # Check if model exists
+        # Load cached model if it exists
         if os.path.exists(model_filename) and os.path.exists(params_filename):
-            # st.info(f"Loading pre-trained model for {provider_name}...")
-            best_rf = joblib.load(model_filename)
+            best_rf     = joblib.load(model_filename)
             best_params = joblib.load(params_filename)
             return best_rf, best_params
 
-        with st.spinner(f"Training model for {provider_name} (this may take a moment)..."):
-            param_grid = {
-                "n_estimators": [10, 100, 200],
-                "max_depth": [None, 3, 5, 10, 20],
-                "min_samples_leaf": [1, 2, 4],
-                "bootstrap": [True, False],
-            }
-            rf_model = RandomForestClassifier(random_state=42)
-            grid_search = GridSearchCV(
-                estimator=rf_model,
-                param_grid=param_grid,
-                scoring='accuracy',
-                cv=3,
-                n_jobs=-1
+        with st.spinner(f"Running Grey Wolf Optimizer for {provider_name}…"):
+            np.random.seed(42)
+            best_params, best_val_acc = grey_wolf_optimizer(
+                _X_train, _y_train, _X_val, _y_val,
+                n_wolves=10, max_iter=20
             )
-            grid_search.fit(_X_train, _y_train)
-            best_rf = grid_search.best_estimator_
 
-            # Save
-            joblib.dump(best_rf, model_filename)
-            joblib.dump(grid_search.best_params_, params_filename)
-        
-        st.success(f"New model trained for {provider_name}!")
-        return best_rf, grid_search.best_params_
+            best_rf = RandomForestClassifier(random_state=42, n_jobs=-1, **best_params)
+            best_rf.fit(_X_train, _y_train)
 
-    best_rf, best_params = train_model_for_provider(selected_provider, X_train_balanced, y_train_balanced)
+            joblib.dump(best_rf,     model_filename)
+            joblib.dump(best_params, params_filename)
+
+        st.success(f"GWO tuning complete for {provider_name}! Best val accuracy: {best_val_acc:.2%}")
+        return best_rf, best_params
+
+    best_rf, best_params = train_model_for_provider(selected_provider, X_train_balanced, y_train_balanced, X_val, y_val)
 
     # ============================================
     # INTERACTIVE PREDICTION
